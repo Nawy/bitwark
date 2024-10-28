@@ -12,18 +12,56 @@
 ---
 
 ## 🚀 Introduction
-Bitwark implements binary JSON Web Tokens as a bandwidth-efficient alternative to standard JWTs, while integrating automated key rotation and salting to dynamically strengthen cryptographic protections.
+**Bitwark** is your go-to library for enhancing security in Rust applications. It offers a streamlined, bandwidth-friendly version of JSON Web Tokens (JWTs) and includes features like automatic key rotation and data salting to bolster your app's defenses.
 
 ### 🔐 Key Features:
 
-* *Binary Signed Payload*: Compact binary encoding of signed payload (similar to JWT)
-* *Default Cryptography*: Bitwark by default uses EdDSA for signing and verifying with SHA3-384 (EdDSA_SHA3-384).
-* *Rotation*: Easily rotate keys and salts, ensuring your application adapts to the dynamic security landscape.
-* *Salting*: Random data injection to increase entropy and slow brute force attacks.
-* *Lightweight*: Minimal overhead, ensuring optimal performance even in high-throughput scenarios.
+* **Compact Tokens**: Uses binary format for signed payloads, saving space compared to traditional JWTs.
+* **Advanced Encryption**: Employs EdDSA with Blake3 for robust signing and verification out of the box.
+* **Dynamic Key Rotation**: Simplifies the process to update keys and salts, keeping your security measures up-to-date.
+* **Enhanced Security with Salting**: Adds random data to payloads, making it tougher for attackers to crack.
+* **Performance Optimized**: Designed to be lightweight, ensuring your applications run smoothly under pressure.
 
 ## 🛠️ Getting Started
-Embark on a secure journey with Bitwark by leveraging the following functionality in your Rust applications:
+Explore the secure features of Bitwark for your Rust applications:
+#### All-in-One Example (Alternative to JWT)
+Imagine you have a structure you wish to sign and send back to the user:
+```rust
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Token {
+    pub user_id: u32,
+    pub permissions: Vec<String>,
+}
+```
+First, generate a key that expires after 10 minutes, though you can set it for days, months, or years as needed. For a non-expiring key, simply use `EdDsaKey::generate()`:
+```rust
+let exp_key = AutoExpiring::<EdDsaKey>::generate(
+    Duration::minutes(10)
+).unwrap();
+```
+Next, create the token. `SaltyExpiringSigned` adds a default 64-byte salt and includes an expiration time:
+```rust
+let token_object = Token { user_id: 123, permissions: vec!["Read".to_string(), "Write".to_string()] };
+
+let token = SaltyExpiringSigned::<Token>::new(
+    chrono::Duration::minutes(10),
+    token_object
+).unwrap();
+```
+Finally, prepare the token for the client. You can return it as bytes or convert it to base64:
+```rust
+let token_bytes: Vec<u8> = token.encode_and_sign(&*exp_key).unwrap();
+```
+When the user provides this token to your service, verifying it is straightforward:
+```rust
+let token = SaltyExpiringSigned::<Token>::decode_and_verify(&token_bytes, &*exp_key).unwrap();
+
+if token.permissions.contains(&String::from("Read")) {
+    // Proceed with the user's request
+}
+```
+
+### More Comprehensive Examples Follow
 #### Signed Payload decoded as binary (alternative to JWT)
 ```rust
 use bitwark::{

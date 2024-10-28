@@ -1,10 +1,8 @@
-use std::marker::PhantomData;
 use std::ops::Deref;
 
 use ed25519_dalek::SIGNATURE_LENGTH;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use sha3::{Digest, Sha3_384};
 
 use crate::error::BwError;
 use crate::keys::{BwSigner, BwVerifier};
@@ -15,8 +13,7 @@ const MIN_TOKEN_LENGTH: usize = SIGNATURE_LENGTH + MIN_MSG_SIZE;
 /// A utility for working with digitally signed payloads.
 ///
 /// `SignedPayload` allows encapsulating a payload of type `T` with a digital signature, which can be
-/// encoded and decoded for secure transport. This struct employs a generic hash function, defaulting to
-/// `Sha3_384`, which is used in the encoding/decoding process.
+/// encoded and decoded for secure transport.
 ///
 /// # Type Parameters
 ///
@@ -32,12 +29,11 @@ const MIN_TOKEN_LENGTH: usize = SIGNATURE_LENGTH + MIN_MSG_SIZE;
 /// let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 /// ```
 #[derive(Debug, Clone)]
-pub struct SignedPayload<T: Serialize + DeserializeOwned, H: Digest = Sha3_384> {
+pub struct SignedPayload<T: Serialize + DeserializeOwned> {
     payload: T,
-    digest: PhantomData<H>,
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
+impl<T: Serialize + DeserializeOwned> SignedPayload<T> {
     /// Creates a new `SignedPayload` with the provided payload.
     ///
     /// # Parameters
@@ -47,7 +43,6 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
     pub fn new(payload: T) -> Self {
         SignedPayload {
             payload,
-            digest: PhantomData::<H>,
         }
     }
 
@@ -76,8 +71,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
     #[inline]
     pub fn encode_and_sign(&self, key: &(impl BwSigner + ?Sized)) -> Result<Vec<u8>, BwError> {
         let payload_bytes = bincode::serialize(&self.payload).expect("Serialization failed");
-        let hashed_payload_bytes = hash::<H>(&payload_bytes);
-        let mut encoded = key.sign(&hashed_payload_bytes)?;
+        let mut encoded = key.sign(&payload_bytes)?;
         encoded.extend(payload_bytes);
         Ok(encoded)
     }
@@ -116,17 +110,15 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
         }
 
         let (signature, body) = bytes.split_at(SIGNATURE_LENGTH);
-        let hashed_body_bytes = hash::<H>(body);
 
         // Verify signature
-        key.verify(&hashed_body_bytes, signature)
+        key.verify(body, signature)
             .map_err(|_| BwError::InvalidSignature)?;
 
         let payload = bincode::deserialize(body).map_err(|_| BwError::InvalidTokenFormat)?;
 
         Ok(SignedPayload {
             payload,
-            digest: PhantomData::<H>,
         })
     }
 
@@ -176,7 +168,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
     /// # Security
     ///
     /// The returned `SignedPayloadUnverified` has not been checked for authenticity or integrity. It is crucial to not trust the contents until after a successful signature verification step.
-    pub fn decode(bytes: &[u8]) -> Result<SignedPayloadUnverified<T, H>, BwError> {
+    pub fn decode(bytes: &[u8]) -> Result<SignedPayloadUnverified<T>, BwError> {
         if bytes.len() < MIN_TOKEN_LENGTH {
             return Err(BwError::InvalidTokenFormat);
         }
@@ -187,7 +179,6 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
         Ok(SignedPayloadUnverified {
             bytes: bytes.to_vec(),
             payload,
-            digest: PhantomData::<H>,
         })
     }
     pub fn encode_and_sign_salted(
@@ -199,8 +190,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
         let mut salted_body = payload_bytes.clone();
         salted_body.extend(salt);
 
-        let hashed_to_sign = hash::<H>(&salted_body);
-        let signature = key.sign(&hashed_to_sign)?;
+        let signature = key.sign(&salted_body)?;
 
         let mut encoded = Vec::with_capacity(SIGNATURE_LENGTH + payload_bytes.len());
         encoded.extend_from_slice(&signature);
@@ -223,17 +213,15 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
         let mut to_verify = Vec::with_capacity(payload.len() + salt.len());
         to_verify.extend_from_slice(payload);
         to_verify.extend_from_slice(salt);
-        let hashed_to_verify = hash::<H>(&to_verify);
 
         // Verify signature
-        key.verify(&hashed_to_verify, signature)
+        key.verify(&to_verify, signature)
             .map_err(|_| BwError::InvalidSignature)?;
 
         let payload = bincode::deserialize(payload).map_err(|_| BwError::InvalidTokenFormat)?;
 
         Ok(SignedPayload {
             payload,
-            digest: PhantomData::<H>,
         })
     }
 
@@ -243,7 +231,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayload<T, H> {
     }
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> Deref for SignedPayload<T, H> {
+impl<T: Serialize + DeserializeOwned> Deref for SignedPayload<T> {
     type Target = T;
 
     fn deref(&self) -> &<Self as Deref>::Target {
@@ -251,34 +239,31 @@ impl<T: Serialize + DeserializeOwned, H: Digest> Deref for SignedPayload<T, H> {
     }
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> AsRef<T> for SignedPayload<T, H> {
+impl<T: Serialize + DeserializeOwned> AsRef<T> for SignedPayload<T> {
     fn as_ref(&self) -> &T {
         &self.payload
     }
 }
 
-pub struct SignedPayloadUnverified<T: Serialize + DeserializeOwned, H: Digest = Sha3_384> {
+pub struct SignedPayloadUnverified<T: Serialize + DeserializeOwned> {
     bytes: Vec<u8>,
     payload: T,
-    digest: PhantomData<H>,
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayloadUnverified<T, H> {
-    pub fn verify(self, key: &(impl BwVerifier + ?Sized)) -> Result<SignedPayload<T, H>, BwError> {
+impl<T: Serialize + DeserializeOwned> SignedPayloadUnverified<T> {
+    pub fn verify(self, key: &(impl BwVerifier + ?Sized)) -> Result<SignedPayload<T>, BwError> {
         if self.bytes.len() < MIN_TOKEN_LENGTH {
             return Err(BwError::InvalidTokenFormat);
         }
 
         let (signature, body) = self.bytes.split_at(SIGNATURE_LENGTH);
-        let hashed_body_bytes = hash::<H>(body);
 
         // Verify signature
-        key.verify(&hashed_body_bytes, signature)
+        key.verify(body, signature)
             .map_err(|_| BwError::InvalidSignature)?;
 
         Ok(SignedPayload {
             payload: self.payload,
-            digest: PhantomData::<H>,
         })
     }
 
@@ -286,7 +271,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayloadUnverified<T, H> {
         self,
         salt: &[u8],
         key: &(impl BwVerifier + ?Sized),
-    ) -> Result<SignedPayload<T, H>, BwError> {
+    ) -> Result<SignedPayload<T>, BwError> {
         if self.bytes.len() < MIN_TOKEN_LENGTH {
             return Err(BwError::InvalidTokenFormat);
         }
@@ -296,17 +281,15 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayloadUnverified<T, H> {
         let mut to_verify = Vec::with_capacity(payload.len() + salt.len());
         to_verify.extend_from_slice(payload);
         to_verify.extend_from_slice(salt);
-        let hashed_to_verify = hash::<H>(&to_verify);
 
         // Verify signature
-        key.verify(&hashed_to_verify, signature)
+        key.verify(&to_verify, signature)
             .map_err(|_| BwError::InvalidSignature)?;
 
         let payload = bincode::deserialize(payload).map_err(|_| BwError::InvalidTokenFormat)?;
 
         Ok(SignedPayload {
             payload,
-            digest: PhantomData::<H>,
         })
     }
 
@@ -316,7 +299,7 @@ impl<T: Serialize + DeserializeOwned, H: Digest> SignedPayloadUnverified<T, H> {
     }
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> Deref for SignedPayloadUnverified<T, H> {
+impl<T: Serialize + DeserializeOwned> Deref for SignedPayloadUnverified<T> {
     type Target = T;
 
     #[inline]
@@ -325,23 +308,16 @@ impl<T: Serialize + DeserializeOwned, H: Digest> Deref for SignedPayloadUnverifi
     }
 }
 
-impl<T: Serialize + DeserializeOwned, H: Digest> PartialEq for SignedPayloadUnverified<T, H> {
+impl<T: Serialize + DeserializeOwned> PartialEq for SignedPayloadUnverified<T> {
     fn eq(&self, other: &Self) -> bool {
         self.bytes == other.bytes
     }
 }
 
-impl<K: Serialize + DeserializeOwned + PartialEq, H: Digest> PartialEq for SignedPayload<K, H> {
+impl<K: Serialize + DeserializeOwned + PartialEq> PartialEq for SignedPayload<K> {
     fn eq(&self, other: &Self) -> bool {
         self.payload == other.payload
     }
-}
-
-#[inline]
-fn hash<H: Digest>(bytes: &[u8]) -> Vec<u8> {
-    let mut hasher = H::new();
-    hasher.update(bytes);
-    hasher.finalize().to_vec()
 }
 
 // Tests --------------------------------------------------------------------------------------
@@ -349,7 +325,7 @@ fn hash<H: Digest>(bytes: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::keys::ed::EdDsaKey;
-    use crate::salt::Salt64;
+    use crate::salt::{Salt64, SaltInfo};
     use crate::Generator;
 
     use super::*;
@@ -389,7 +365,7 @@ mod tests {
         let salt = Salt64::generate().unwrap();
         let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 
-        let _encoded = payload.encode_and_sign_salted(&salt, &key).unwrap();
+        let _encoded = payload.encode_and_sign_salted(salt.as_bytes(), &key).unwrap();
     }
 
     #[test]
@@ -398,9 +374,9 @@ mod tests {
         let salt = Salt64::generate().unwrap();
         let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 
-        let signed_bytes = payload.encode_and_sign_salted(&salt, &key).unwrap();
+        let signed_bytes = payload.encode_and_sign_salted(salt.as_bytes(), &key).unwrap();
         let decoded_payload =
-            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, &salt, &key);
+            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, salt.as_bytes(), &key);
         assert!(decoded_payload.is_ok());
     }
 
@@ -410,9 +386,9 @@ mod tests {
         let salt = Salt64::generate().unwrap();
         let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 
-        let signed_bytes = payload.encode_and_sign_salted(&salt, &key).unwrap();
+        let signed_bytes = payload.encode_and_sign_salted(salt.as_bytes(), &key).unwrap();
         let decoded_payload = SignedPayload::<String>::decode(&signed_bytes).unwrap();
-        let decoded_payload = decoded_payload.verify_salted(&salt, &key);
+        let decoded_payload = decoded_payload.verify_salted(salt.as_bytes(), &key);
         assert!(decoded_payload.is_ok());
         assert_eq!(*decoded_payload.unwrap(), *payload);
     }
@@ -423,11 +399,11 @@ mod tests {
         let salt = Salt64::generate().unwrap();
         let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 
-        let signed_bytes = payload.encode_and_sign_salted(&salt, &key).unwrap();
+        let signed_bytes = payload.encode_and_sign_salted(salt.as_bytes(), &key).unwrap();
 
         let another_salt = Salt64::generate().unwrap();
         let decoded_payload =
-            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, &another_salt, &key);
+            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, another_salt.as_bytes(), &key);
         assert!(decoded_payload.is_err());
     }
 
@@ -437,11 +413,11 @@ mod tests {
         let salt = Salt64::generate().unwrap();
         let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 
-        let signed_bytes = payload.encode_and_sign_salted(&salt, &key).unwrap();
+        let signed_bytes = payload.encode_and_sign_salted(salt.as_bytes(), &key).unwrap();
 
         let another_key = EdDsaKey::generate().unwrap();
         let decoded_payload =
-            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, &salt, &another_key);
+            SignedPayload::<String>::decode_and_verify_salted(&signed_bytes, salt.as_bytes(), &another_key);
         assert!(decoded_payload.is_err());
     }
 

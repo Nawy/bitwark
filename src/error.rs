@@ -1,15 +1,20 @@
+use ed25519_dalek::SignatureError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum BwError {
-    #[error("Token is expired")]
+    #[error("token is expired")]
     Expired,
-    #[error("Invalid signature")]
+    #[error("invalid signature")]
     InvalidSignature,
-    #[error("Invalid token format")]
+    #[error("invalid token format")]
     InvalidTokenFormat,
-    #[error("Failed to generate a salt")]
+    #[error("failed to generate a salt")]
     FailedSaltGeneration,
-    #[error("Incorrect timestamp")]
+    #[error("incorrect timestamp")]
     IncorrectTimestamp,
+    #[error("invalid salt length: expected {expected} bytes but got {actual} bytes")]
+    InvalidSaltLength { expected: usize, actual: usize },
+    #[error(transparent)]
+    InvalidDigest(#[from] SignatureError)
 }

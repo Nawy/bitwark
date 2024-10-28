@@ -14,7 +14,7 @@
 //!
 //! ## Signed Payload decoded as binary (alternative to JWT)
 //! ```
-//! # use bitwark::{exp::AutoExpiring, signed_exp::ExpiringSigned, salt::Salt64, keys::{ed::EdDsaKey}};
+//! # use bitwark::{exp::AutoExpiring, signed_exp::ExpiringSigned, salt::{Salt64,SaltInfo}, keys::{ed::EdDsaKey}};
 //! # use serde::{Serialize, Deserialize};
 //! # use chrono::Duration;
 //! #[derive(Serialize,Deserialize, Clone)]
@@ -34,12 +34,12 @@
 //! let token = ExpiringSigned::<Claims>::new(Duration::seconds(120), claims).unwrap();
 //!
 //! // Create a binary encoding of the token, signed with the key and salt.
-//! let signed_token_bytes = token.encode_and_sign_salted(&exp_salt, &*exp_key)
+//! let signed_token_bytes = token.encode_and_sign_salted(exp_salt.as_bytes(), &*exp_key)
 //!     .expect("Failed to sign token");
 //!
 //! // Decode the token and verify its signature and validity.
 //! let decoded_token = ExpiringSigned::<Claims>::decode_and_verify_salted(
-//!     &signed_token_bytes, &exp_salt, &*exp_key
+//!     &signed_token_bytes, exp_salt.as_bytes(), &*exp_key
 //! ).expect("Failed to decode a token");
 //! assert_eq!(2, decoded_token.permissions.len(), "Failed to find 2 permissions");
 //! ```
@@ -119,7 +119,7 @@
 //! Example with Rotation (Assuming `Expiring` is a structure which utilizes the `Rotation` trait):
 //!
 //! ```
-//! use bitwark::{salt::Salt64, exp::AutoExpiring, keys::ed::EdDsaKey, Rotation, Generator};
+//! use bitwark::{salt::{Salt64, SaltInfo}, exp::AutoExpiring, keys::ed::EdDsaKey, Rotation, Generator};
 //! use bitwark::payload::SignedPayload;
 //! use chrono::Duration;
 //!
@@ -140,10 +140,10 @@
 //! let payload = SignedPayload::<String>::new("Hello, world!".to_string());
 //!
 //! // Combine the message and a special code (signature) into one piece.
-//! let signature_bytes = payload.encode_and_sign_salted(&expiring_salt, &*key).expect("Failed to encode");
+//! let signature_bytes = payload.encode_and_sign_salted(expiring_salt.as_bytes(), &*key).expect("Failed to encode");
 //!
 //! // Separate the message and the signature, checking they're valid.
-//! let decoded_result = SignedPayload::<String>::decode_and_verify_salted(&signature_bytes, &expiring_salt, &*key);
+//! let decoded_result = SignedPayload::<String>::decode_and_verify_salted(&signature_bytes, expiring_salt.as_bytes(), &*key);
 //! assert!(decoded_result.is_ok());
 //! ```
 //!
