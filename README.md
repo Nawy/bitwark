@@ -191,18 +191,17 @@ assert!(decoded_result.is_ok());
 ```
 
 ## 💡 Motivation
-In an era where data security is paramount, Bitwark aims to offer developers a toolbox for crafting secure digital interactions without compromising on performance or ease of use. Lightweight binary JWT tokens minimize bandwidth usage, while key rotation and salt functionalities amplify security, ensuring your applications are not just secure, but also efficient and reliable.
+In today's digital landscape, security must not come at the expense of performance. Bitwark addresses this challenge by:
+* Providing lightweight, bandwidth-efficient tokens for data exchange.
+* Offering robust security features like automatic key rotation and salting to adapt to evolving threats.
 
 ## 🌱 Contribution
 ### Be a Part of Bitwark’s Journey!
-Contributors are the backbone of open-source projects, and Bitwark warmly welcomes everyone who’s eager to contribute to the realms of binary security!
-
-#### 🎗 How to Contribute:
-
-* 🧠 Propose Ideas: Share enhancement ideas or report bugs through Issues.
-* 🛠 Code Contributions: Submit a Pull Request with new features, enhancements, or bug fixes.
-* 📚 Improve Documentation: Help us make our documentation comprehensive and user-friendly.
-* 💬 Community Interaction: Join discussions and provide feedback to help make Bitwark better.
+We believe in the power of community, and Bitwark thrives on contributions from developers like you:
+* **Propose Ideas**: Found a bug or have an idea? Open an **Issue!**
+* **Code Contributions**: Enhance Bitwark by submitting **Pull Requests** with your code.
+* **Documentation**: Help us keep our documentation clear and helpful.
+* **Engage**: Participate in community discussions to shape Bitwark's future.
 
 ## 📜 License
-Bitwark is open-source software, freely available under the MIT License or BSD-3-Clause.
+**Bitwark** is licensed under the MIT License or Apache-2.0 to ensure it remains accessible for all developers.

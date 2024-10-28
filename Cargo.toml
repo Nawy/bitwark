@@ -1,9 +1,9 @@
 [package]
 name = "bitwark"
-version = "1.2.3"
+version = "2.0.0"
 authors = ["Ivan Ermolaev <ermolaevym@gmail.com>"]
 edition = "2021"
-license = "MIT OR BSD-3-Clause"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "Empowering secure digital interactions with robust binary token management and dynamic rolling keys"
 homepage = "https://github.com/versolid/bitwark"
