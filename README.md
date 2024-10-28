@@ -4,7 +4,7 @@
 [actions]: https://github.com/versolid/bitwark/actions?query=branch%3Amain
 [Latest Version]: https://img.shields.io/crates/v/bitwark.svg
 [crates.io]: https://crates.io/crates/bitwark
-[bitwark: rustc 1.65+]: https://img.shields.io/badge/bitwark-rustc_1.65+-lightgray.svg
+[bitwark: rustc 1.66+]: https://img.shields.io/badge/bitwark-rustc_1.65+-lightgray.svg
 [Rust 1.65]: https://blog.rust-lang.org/2021/10/21/Rust-1.65.0.html
 
 **Provides robust security for Rust applications through compact binary tokens and automated cryptographic defenses.**
