@@ -1,6 +1,10 @@
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
+use ed25519_dalek::ed25519::signature::digest::{FixedOutput, FixedOutputReset, HashMarker, Output, OutputSizeUser, Reset};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use ed25519_dalek::Digest;
+use ed25519_dalek::ed25519::signature::digest::generic_array::GenericArray;
+use generic_array::{typenum::U64};
 
 use crate::error::BwError;
 use crate::keys::{BwSigner, BwVerifier};
@@ -86,7 +90,9 @@ impl BwSigner for EdDsaKey {
     /// ```
     #[inline]
     fn sign(&self, bytes: &[u8]) -> Result<Vec<u8>, BwError> {
-        Ok(self.signing_key.sign(bytes).to_vec())
+        let mut hasher = Blake3Digest64::new();
+        hasher.update(bytes);
+        Ok(self.signing_key.sign_prehashed(hasher, None)?.to_vec())
     }
 }
 
@@ -118,8 +124,10 @@ impl BwVerifier for EdDsaKey {
     #[inline]
     fn verify(&self, bytes: &[u8], signature: &[u8]) -> Result<(), BwError> {
         let signature = &Signature::try_from(signature).map_err(|_| BwError::InvalidSignature)?;
+        let mut hasher = Blake3Digest64::new();
+        hasher.update(bytes);
         self.signing_key
-            .verify(bytes, signature)
+            .verify_prehashed(hasher, None, signature)
             .map_err(|_| BwError::InvalidSignature)
     }
 }
@@ -138,8 +146,10 @@ pub struct EdDsaPubKey {
 impl BwVerifier for EdDsaPubKey {
     fn verify(&self, bytes: &[u8], signature: &[u8]) -> Result<(), BwError> {
         let signature = &Signature::try_from(signature).map_err(|_| BwError::InvalidSignature)?;
+        let mut hasher = Blake3Digest64::new();
+        hasher.update(bytes);
         self.verifying_key
-            .verify(bytes, signature)
+            .verify_prehashed(hasher, None, signature)
             .map_err(|_| BwError::InvalidSignature)
     }
 }
@@ -149,6 +159,49 @@ impl From<&EdDsaKey> for EdDsaPubKey {
         Self {
             verifying_key: secret_key.signing_key.verifying_key(),
         }
+    }
+}
+
+// Hasher -------------------------------------------------------------------------------------
+struct Blake3Digest64(blake3::Hasher);
+impl Reset for Blake3Digest64 {
+    #[inline]
+    fn reset(&mut self) {
+        self.0 = blake3::Hasher::new();
+    }
+}
+impl OutputSizeUser for Blake3Digest64 { type OutputSize = U64; }
+
+impl FixedOutput for Blake3Digest64 {
+    fn finalize_into(self, out: &mut Output<Self>) {
+        self.0.finalize_xof().fill(out);
+    }
+}
+
+impl ed25519_dalek::ed25519::signature::digest::Update for Blake3Digest64 {
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+}
+
+impl FixedOutputReset for Blake3Digest64 {
+    #[inline]
+    fn finalize_into_reset(&mut self, out: &mut GenericArray<u8, Self::OutputSize>) {
+        self.0.finalize_xof().fill(out);
+        Reset::reset(self);
+    }
+}
+impl HashMarker for Blake3Digest64 {}
+
+impl Clone for Blake3Digest64 {
+    fn clone(&self) -> Self {
+        Blake3Digest64(self.0.clone())
+    }
+}
+
+impl Default for Blake3Digest64 {
+    fn default() -> Self {
+        Blake3Digest64(blake3::Hasher::new())
     }
 }
 

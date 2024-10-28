@@ -5,22 +5,41 @@ use serde::{Deserialize, Serialize};
 
 use crate::{error::BwError, Generator};
 
+pub trait SaltInfo {
+    fn salt_length() -> usize;
+    fn as_bytes(&self) -> &[u8];
+}
+
 macro_rules! impl_salt {
     ($name:ident, $length:expr) => {
         #[derive(Serialize, Deserialize, Debug)]
-        pub struct $name(#[serde(with = "serde_bytes")] Vec<u8>);
+        pub struct $name(#[serde(with = "serde_bytes")] [u8; $length]);
 
         impl Generator for $name {
             fn generate() -> Result<Self, BwError>
             where
                 Self: Sized,
             {
-                Ok(Self(generate_secure_bytes($length)?))
+                let rng = SystemRandom::new();
+                let mut bytes = [0u8; $length];
+                rng.fill(&mut bytes)
+                    .map_err(|_| BwError::FailedSaltGeneration)?;
+                Ok(Self(bytes))
+            }
+        }
+
+        impl SaltInfo for $name {
+            fn salt_length() -> usize {
+                $length
+            }
+
+            fn as_bytes(&self) -> &[u8] {
+                &self.0
             }
         }
 
         impl Deref for $name {
-            type Target = Vec<u8>;
+            type Target = [u8; $length];
 
             fn deref(&self) -> &Self::Target {
                 &self.0
@@ -33,15 +52,38 @@ macro_rules! impl_salt {
             }
         }
 
-        impl From<$name> for Vec<u8> {
-            fn from(value: $name) -> Self {
-                value.0
-            }
-        }
-
         impl Clone for $name {
             fn clone(&self) -> Self {
                 $name(self.0.clone())
+            }
+        }
+
+        impl From<$name> for Vec<u8> {
+            fn from(value: $name) -> Self {
+                value.0.to_vec()
+            }
+        }
+
+        impl From<[u8; $length]> for $name {
+            fn from(value: [u8; $length]) -> Self {
+                Self(value)
+            }
+        }
+
+        impl TryFrom<Vec<u8>> for $name {
+            type Error = BwError;
+
+            fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+                if value.len() != $length {
+                    return Err(BwError::InvalidSaltLength {
+                        expected: $length,
+                        actual: value.len(),
+                    });
+                }
+
+                let mut bytes = [0u8; $length];
+                bytes.copy_from_slice(&value);
+                Ok(Self(bytes))
             }
         }
     };
@@ -52,15 +94,6 @@ impl_salt!(Salt64, 64);
 impl_salt!(Salt32, 32);
 impl_salt!(Salt16, 16);
 impl_salt!(Salt12, 12);
-
-#[inline(always)]
-fn generate_secure_bytes(length: usize) -> Result<Vec<u8>, BwError> {
-    let rng = SystemRandom::new();
-    let mut bytes = vec![0u8; length];
-    rng.fill(&mut bytes)
-        .map_err(|_| BwError::FailedSaltGeneration)?;
-    Ok(bytes)
-}
 
 // Tests --------------------------------------------------------------------------------------
 

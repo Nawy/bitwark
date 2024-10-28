@@ -4,7 +4,7 @@
 [actions]: https://github.com/versolid/bitwark/actions?query=branch%3Amain
 [Latest Version]: https://img.shields.io/crates/v/bitwark.svg
 [crates.io]: https://crates.io/crates/bitwark
-[bitwark: rustc 1.65+]: https://img.shields.io/badge/bitwark-rustc_1.65+-lightgray.svg
+[bitwark: rustc 1.66+]: https://img.shields.io/badge/bitwark-rustc_1.65+-lightgray.svg
 [Rust 1.65]: https://blog.rust-lang.org/2021/10/21/Rust-1.65.0.html
 
 **Provides robust security for Rust applications through compact binary tokens and automated cryptographic defenses.**
@@ -12,18 +12,56 @@
 ---
 
 ## 🚀 Introduction
-Bitwark implements binary JSON Web Tokens as a bandwidth-efficient alternative to standard JWTs, while integrating automated key rotation and salting to dynamically strengthen cryptographic protections.
+**Bitwark** is your go-to library for enhancing security in Rust applications. It offers a streamlined, bandwidth-friendly version of JSON Web Tokens (JWTs) and includes features like automatic key rotation and data salting to bolster your app's defenses.
 
 ### 🔐 Key Features:
 
-* *Binary Signed Payload*: Compact binary encoding of signed payload (similar to JWT)
-* *Default Cryptography*: Bitwark by default uses EdDSA for signing and verifying with SHA3-384 (EdDSA_SHA3-384).
-* *Rotation*: Easily rotate keys and salts, ensuring your application adapts to the dynamic security landscape.
-* *Salting*: Random data injection to increase entropy and slow brute force attacks.
-* *Lightweight*: Minimal overhead, ensuring optimal performance even in high-throughput scenarios.
+* **Compact Tokens**: Uses binary format for signed payloads, saving space compared to traditional JWTs.
+* **Advanced Encryption**: Employs EdDSA with Blake3 for robust signing and verification out of the box.
+* **Dynamic Key Rotation**: Simplifies the process to update keys and salts, keeping your security measures up-to-date.
+* **Enhanced Security with Salting**: Adds random data to payloads, making it tougher for attackers to crack.
+* **Performance Optimized**: Designed to be lightweight, ensuring your applications run smoothly under pressure.
 
 ## 🛠️ Getting Started
-Embark on a secure journey with Bitwark by leveraging the following functionality in your Rust applications:
+Explore the secure features of Bitwark for your Rust applications:
+#### All-in-One Example (Alternative to JWT)
+Imagine you have a structure you wish to sign and send back to the user:
+```rust
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Token {
+    pub user_id: u32,
+    pub permissions: Vec<String>,
+}
+```
+First, generate a key that expires after 10 minutes, though you can set it for days, months, or years as needed. For a non-expiring key, simply use `EdDsaKey::generate()`:
+```rust
+let exp_key = AutoExpiring::<EdDsaKey>::generate(
+    Duration::minutes(10)
+).unwrap();
+```
+Next, create the token. `SaltyExpiringSigned` adds a default 64-byte salt and includes an expiration time:
+```rust
+let token_object = Token { user_id: 123, permissions: vec!["Read".to_string(), "Write".to_string()] };
+
+let token = SaltyExpiringSigned::<Token>::new(
+    chrono::Duration::minutes(10),
+    token_object
+).unwrap();
+```
+Finally, prepare the token for the client. You can return it as bytes or convert it to base64:
+```rust
+let token_bytes: Vec<u8> = token.encode_and_sign(&*exp_key).unwrap();
+```
+When the user provides this token to your service, verifying it is straightforward:
+```rust
+let token = SaltyExpiringSigned::<Token>::decode_and_verify(&token_bytes, &*exp_key).unwrap();
+
+if token.permissions.contains(&String::from("Read")) {
+    // Proceed with the user's request
+}
+```
+
+### More Comprehensive Examples Follow
 #### Signed Payload decoded as binary (alternative to JWT)
 ```rust
 use bitwark::{
@@ -153,18 +191,17 @@ assert!(decoded_result.is_ok());
 ```
 
 ## 💡 Motivation
-In an era where data security is paramount, Bitwark aims to offer developers a toolbox for crafting secure digital interactions without compromising on performance or ease of use. Lightweight binary JWT tokens minimize bandwidth usage, while key rotation and salt functionalities amplify security, ensuring your applications are not just secure, but also efficient and reliable.
+In today's digital landscape, security must not come at the expense of performance. Bitwark addresses this challenge by:
+* Providing lightweight, bandwidth-efficient tokens for data exchange.
+* Offering robust security features like automatic key rotation and salting to adapt to evolving threats.
 
 ## 🌱 Contribution
 ### Be a Part of Bitwark’s Journey!
-Contributors are the backbone of open-source projects, and Bitwark warmly welcomes everyone who’s eager to contribute to the realms of binary security!
-
-#### 🎗 How to Contribute:
-
-* 🧠 Propose Ideas: Share enhancement ideas or report bugs through Issues.
-* 🛠 Code Contributions: Submit a Pull Request with new features, enhancements, or bug fixes.
-* 📚 Improve Documentation: Help us make our documentation comprehensive and user-friendly.
-* 💬 Community Interaction: Join discussions and provide feedback to help make Bitwark better.
+We believe in the power of community, and Bitwark thrives on contributions from developers like you:
+* **Propose Ideas**: Found a bug or have an idea? Open an **Issue!**
+* **Code Contributions**: Enhance Bitwark by submitting **Pull Requests** with your code.
+* **Documentation**: Help us keep our documentation clear and helpful.
+* **Engage**: Participate in community discussions to shape Bitwark's future.
 
 ## 📜 License
-Bitwark is open-source software, freely available under the MIT License or BSD-3-Clause.
+**Bitwark** is licensed under the MIT License or Apache-2.0 to ensure it remains accessible for all developers.
