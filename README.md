@@ -1,4 +1,4 @@
-# Bitwark &emsp;  [![Build Status]][actions] [![Latest Version]][crates.io] [![bitwark: rustc 1.65+]][Rust 1.65]
+# Bitwark &emsp;  [![Build Status]][actions] [![Latest Version]][crates.io] [![bitwark: rustc 1.66+]][Rust 1.65]
 
 [Build Status]: https://img.shields.io/github/actions/workflow/status/versolid/bitwark/rust.yml?branch=main
 [actions]: https://github.com/versolid/bitwark/actions?query=branch%3Amain
