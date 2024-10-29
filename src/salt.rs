@@ -89,7 +89,7 @@ macro_rules! impl_salt {
     };
 }
 
-impl_salt!(Salt126, 126);
+impl_salt!(Salt128, 128);
 impl_salt!(Salt64, 64);
 impl_salt!(Salt32, 32);
 impl_salt!(Salt16, 16);

@@ -6,24 +6,23 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "Empowering secure digital interactions with robust binary token management and dynamic rolling keys"
-homepage = "https://github.com/versolid/bitwark"
+homepage = "https://github.com/Nawy/bitwark"
 repository = "https://github.com/Nawy/bitwark"
 documentation = "https://docs.rs/bitwark"
 keywords = ["jwt", "auth", "token", "quic", "security"]
 categories = ["cryptography", "authentication"]
 
 exclude = [".idea/*"]
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.204", features = ["derive"] }
+serde = { version = "1.0.214", features = ["derive"] }
 serde_bytes = "0.11.15"
 ed25519-dalek = { version = "2.1.1", features = ["rand_core", "zeroize", "pkcs8", "serde", "digest"] }
 bincode = "1.3.3"
 ring = "0.17.8"
 rand = "0.8.5"
 blake3 = "1.5.4"
-thiserror = "1.0.63"
+thiserror = "1.0.65"
 chrono = "0.4.38"
 generic-array = "1.1.0"
 typenum = "1.17.0"
