@@ -5,10 +5,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::error::BwError;
-use crate::Generator;
 use crate::keys::{BwSigner, BwVerifier};
 use crate::payload::{SignedPayload, SignedPayloadUnverified};
 use crate::salt::SaltInfo;
+use crate::Generator;
 
 #[derive(Serialize, Deserialize)]
 struct ExpiringBlock<T> {
@@ -34,7 +34,7 @@ impl<T: Serialize + DeserializeOwned + Clone> ExpiringSigned<T> {
         let expiration = Utc::now()
             .checked_add_signed(exp)
             .ok_or(BwError::IncorrectTimestamp)?
-            .timestamp();
+            .timestamp_micros();
 
         let block = ExpiringBlock {
             exp: expiration,
@@ -65,7 +65,7 @@ impl<T: Serialize + DeserializeOwned + Clone> ExpiringSigned<T> {
     ) -> Result<Self, BwError> {
         let signed_payload = SignedPayload::<ExpiringBlock<T>>::decode_and_verify(bytes, key)?;
         // Verify expiration
-        if Utc::now().timestamp() > signed_payload.exp {
+        if Utc::now().timestamp_micros() > signed_payload.exp {
             return Err(BwError::Expired);
         }
 
@@ -163,16 +163,15 @@ where
     <S as TryFrom<Vec<u8>>>::Error: Into<BwError>,
 {
     expiring_payload: ExpiringSigned<T>,
-    salt: S
+    salt: S,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone, S> SaltyExpiringSigned<T, S>
 where
     S: Generator + SaltInfo + TryFrom<Vec<u8>>,
     <S as TryFrom<Vec<u8>>>::Error: Into<BwError>,
-    BwError: From<<S as TryFrom<Vec<u8>>>::Error>
+    BwError: From<<S as TryFrom<Vec<u8>>>::Error>,
 {
-
     pub fn new(exp: chrono::Duration, payload: T) -> Result<Self, BwError> {
         Ok(Self {
             expiring_payload: ExpiringSigned::<T>::new(exp, payload)?,
@@ -181,14 +180,16 @@ where
     }
 
     pub fn encode_and_sign(self, key: &(impl BwSigner + ?Sized)) -> Result<Vec<u8>, BwError> {
-        let mut res_digest = self.expiring_payload.encode_and_sign_salted(self.salt.as_bytes(), key)?;
+        let mut res_digest = self
+            .expiring_payload
+            .encode_and_sign_salted(self.salt.as_bytes(), key)?;
         res_digest.extend_from_slice(self.salt.as_bytes());
         Ok(res_digest)
     }
 
     pub fn decode_and_verify(
         bytes: &[u8],
-        key: &(impl BwVerifier + ?Sized)
+        key: &(impl BwVerifier + ?Sized),
     ) -> Result<ExpiringSigned<T>, BwError> {
         let (payload, salt) = bytes.split_at(bytes.len() - S::salt_length());
         ExpiringSigned::decode_and_verify_salted(payload, salt, key)
@@ -196,7 +197,7 @@ where
 
     pub fn decode_and_verify_raw(
         bytes: &[u8],
-        key: &(impl BwVerifier + ?Sized)
+        key: &(impl BwVerifier + ?Sized),
     ) -> Result<SaltyExpiringSigned<T, S>, BwError> {
         let (payload, salt) = bytes.split_at(bytes.len() - S::salt_length());
         Ok(Self {
@@ -210,7 +211,7 @@ impl<T: Serialize + DeserializeOwned, S> Deref for SaltyExpiringSigned<T, S>
 where
     S: Generator + SaltInfo + TryFrom<Vec<u8>>,
     <S as TryFrom<Vec<u8>>>::Error: Into<BwError>,
-    BwError: From<<S as TryFrom<Vec<u8>>>::Error>
+    BwError: From<<S as TryFrom<Vec<u8>>>::Error>,
 {
     type Target = T;
 
@@ -296,7 +297,9 @@ mod tests {
         let object =
             ExpiringSigned::<String>::new(chrono::Duration::seconds(100), "Something".to_string())
                 .unwrap();
-        let encoded_bytes = object.encode_and_sign_salted(salt.as_bytes(), &ed_key).unwrap();
+        let encoded_bytes = object
+            .encode_and_sign_salted(salt.as_bytes(), &ed_key)
+            .unwrap();
         let decoded = ExpiringSigned::<String>::decode(&encoded_bytes).unwrap();
 
         assert_eq!(*decoded, *object);
@@ -393,18 +396,75 @@ mod tests {
     #[test]
     fn encode_decode_salty_expiring_signed() {
         let payload = "This is payload";
-        let token = SaltyExpiringSigned::<String>::new(
-            chrono::Duration::seconds(60),
-            payload.to_string(),
-        ).unwrap();
+        let token =
+            SaltyExpiringSigned::<String>::new(chrono::Duration::seconds(60), payload.to_string())
+                .unwrap();
         let ed_key = EdDsaKey::generate().expect("Must generate a key");
 
         let token_bytes = token.encode_and_sign(&ed_key).unwrap();
 
         // verify
-        let decoded_token_res = SaltyExpiringSigned::<String>::decode_and_verify(&token_bytes, &ed_key);
+        let decoded_token_res =
+            SaltyExpiringSigned::<String>::decode_and_verify(&token_bytes, &ed_key);
         assert!(decoded_token_res.is_ok());
         let decoded_token = decoded_token_res.unwrap();
         assert_eq!(&*decoded_token, payload)
+    }
+
+    #[test]
+    fn boundary_expiration_test() {
+        let token =
+            ExpiringSigned::<String>::new(Duration::seconds(0), "Boundary Test".to_string())
+                .unwrap();
+        let ed_key = EdDsaKey::generate().expect("Must generate a key");
+
+        let encoded = token.encode_and_sign(&ed_key).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let decoded = ExpiringSigned::<String>::decode_and_verify(&encoded, &ed_key);
+
+        assert!(matches!(decoded, Err(BwError::Expired)));
+    }
+
+    #[test]
+    fn clone_test() {
+        let payload = "Clone Test".to_string();
+        let token = ExpiringSigned::<String>::new(Duration::seconds(60), payload.clone()).unwrap();
+
+        let cloned_token = token.clone();
+        assert_eq!(*token, *cloned_token);
+    }
+
+    #[test]
+    fn clone_salty_expiring_signed_test() {
+        let payload = "Clone Salty Test".to_string();
+        let token =
+            SaltyExpiringSigned::<String>::new(Duration::seconds(60), payload.clone()).unwrap();
+
+        let cloned_token = token.clone();
+        assert_eq!(&*token, &*cloned_token);
+    }
+
+    #[test]
+    fn empty_payload_test() {
+        let token = ExpiringSigned::<String>::new(Duration::seconds(60), "".to_string()).unwrap();
+        let ed_key = EdDsaKey::generate().expect("Must generate a key");
+
+        let encoded = token.encode_and_sign(&ed_key).unwrap();
+        let decoded = ExpiringSigned::<String>::decode_and_verify(&encoded, &ed_key).unwrap();
+
+        assert_eq!(*decoded, "");
+    }
+
+    #[test]
+    fn large_payload_test() {
+        let large_payload = "a".repeat(10_000); // 10,000 characters
+        let token =
+            ExpiringSigned::<String>::new(Duration::seconds(60), large_payload.clone()).unwrap();
+        let ed_key = EdDsaKey::generate().expect("Must generate a key");
+
+        let encoded = token.encode_and_sign(&ed_key).unwrap();
+        let decoded = ExpiringSigned::<String>::decode_and_verify(&encoded, &ed_key).unwrap();
+
+        assert_eq!(*decoded, large_payload);
     }
 }
