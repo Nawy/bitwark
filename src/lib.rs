@@ -1,16 +1,16 @@
 //! # 🛡️ Bitwark: Binary Bulwark in Rust
-//! Bitwark is a cryptographic Rust library (used ring, ed25519-dalek), designed to facilitate secure digital interactions through a meticulous amalgamation of lightweight binary JWT tokens, dynamic key rotation, and strategic salt functionalities, all embedded in a minimalistic API.
+//! Bitwark is a cryptographic Rust library (used ring, ed25519-dalek, blake3), designed to facilitate secure digital interactions through a meticulous amalgamation of lightweight binary JWT tokens, dynamic key rotation, and strategic salt functionalities, all embedded in a minimalistic API.
 //! Through Bitwark, developers can seamlessly perform crucial security operations, such as key and salt generation, payload signing, and integrity message verification, all whilst ensuring optimal performance and security in their applications.
 //!
 //! ## 🚀 Getting Started
 //! Engage in a fortified cryptographic experience with Bitwark, utilizing functionalities like secure payload creation, signature encoding, and strategic key rotation with simplicity and efficacy.
 //!
 //! ### 🔐 Key Features:
-//! * *Binary* Signed Payload: Compact binary encoding of signed payload (similar to JWT)
-//! * *Default* Cryptography: Bitwark by default uses EdDSA for signing and verifying with SHA3-384 (EdDSA_SHA3-384).
-//! * *Rotation* Easily rotate keys and salts, ensuring your application adapts to the dynamic security landscape.
-//! * *Salting*: Random data injection to increase entropy and slow brute force attacks.
-//! * *Lightweight*: Minimal overhead, ensuring optimal performance even in high-throughput scenarios.
+//! * **Compact Tokens**: Uses binary format for signed payloads, saving space compared to traditional JWTs.
+//! * **Advanced Encryption**: Employs EdDSA with Blake3 for robust signing and verification out of the box.
+//! * **Dynamic Key Rotation**: Simplifies the process to update keys and salts, keeping your security measures up-to-date.
+//! * **Enhanced Security with Salting**: Adds random data to payloads, making it tougher for attackers to crack.
+//! * **Performance Optimized**: Designed to be lightweight, ensuring your applications run smoothly under pressure.
 //!
 //! ## Signed Payload decoded as binary (alternative to JWT)
 //! ```
